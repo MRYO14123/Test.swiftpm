@@ -35,9 +35,15 @@ enum SpeedMultiplier: Double, CaseIterable {
         }
     }
 
-    // カウントダウンの間隔（倍速が速いほど間隔が短い）
-    var interval: Double {
-        return 1.0 / rawValue
+    // 難易度の説明
+    var difficultyLabel: String {
+        switch self {
+        case .slow: return "簡単"
+        case .normal: return "普通"
+        case .fast: return "やや難"
+        case .veryFast: return "難しい"
+        case .ultraFast: return "超難"
+        }
     }
 
     static func random() -> SpeedMultiplier {
@@ -287,10 +293,10 @@ struct ContentView: View {
     // 速度インジケーター
     private var speedIndicatorView: some View {
         HStack(spacing: 8) {
-            Image(systemName: "speedometer")
+            Image(systemName: "hare.fill")
                 .foregroundColor(currentSpeed.color)
-            Text("カウント速度: \(currentSpeed.displayName)")
-                .font(.system(size: 16, weight: .medium, design: .rounded))
+            Text("時間の流れ: \(currentSpeed.displayName) (\(currentSpeed.difficultyLabel))")
+                .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundColor(currentSpeed.color)
         }
         .padding(.horizontal, 20)
@@ -451,8 +457,8 @@ struct ContentView: View {
         let countdownSequence = ["3", "2", "1", "Start!"]
         var index = 0
 
-        // 速度に応じたインターバルでカウントダウン
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: currentSpeed.interval, repeats: true) { timer in
+        // カウントダウンは通常速度（1秒間隔）
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
             if index < countdownSequence.count {
                 countdownText = countdownSequence[index]
                 index += 1
@@ -460,7 +466,7 @@ struct ContentView: View {
 
             if index == countdownSequence.count {
                 timer.invalidate()
-                DispatchQueue.main.asyncAfter(deadline: .now() + currentSpeed.interval * 0.5) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     startTimer()
                 }
             }
@@ -476,7 +482,9 @@ struct ContentView: View {
     // ゲーム停止
     private func stopGame() {
         if let start = startTime {
-            elapsedTime = Date().timeIntervalSince(start)
+            // 実際の経過時間に倍速を適用（倍速が速いほど時間が速く進む）
+            let actualTime = Date().timeIntervalSince(start)
+            elapsedTime = actualTime * currentSpeed.rawValue
         }
         timer?.invalidate()
         timer = nil
