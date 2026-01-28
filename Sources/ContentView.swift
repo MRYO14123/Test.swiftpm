@@ -35,7 +35,6 @@ enum SpeedMultiplier: Double, CaseIterable {
         }
     }
 
-    // 難易度の説明
     var difficultyLabel: String {
         switch self {
         case .slow: return "簡単"
@@ -95,7 +94,6 @@ class RankingManager: ObservableObject {
     func addRecord(_ record: GameRecord) {
         records.append(record)
         records.sort { $0.difference < $1.difference }
-        // 上位20件のみ保持
         if records.count > 20 {
             records = Array(records.prefix(20))
         }
@@ -129,67 +127,197 @@ class RankingManager: ObservableObject {
     }
 }
 
-// 踊るおじさんアニメーション
+// 踊るおじさんアニメーション（拡張版）
 struct DancingManView: View {
     @State private var isAnimating = false
     @State private var bounceOffset: CGFloat = 0
     @State private var rotation: Double = 0
-    @State private var armAngle: Double = 0
-
-    let emojis = ["🕺", "💃", "🧍", "🏃", "🚶"]
+    @State private var horizontalOffset: CGFloat = 0
+    @State private var colorHue: Double = 0
     @State private var currentEmojiIndex = 0
+    @State private var currentMessageIndex = 0
+    @State private var showSparkle = false
+    @State private var sparkleRotation: Double = 0
+
+    let emojis = ["🕺", "💃", "🧍", "🏃", "🚶", "🤸", "🧘", "🏋️", "⛹️", "🤾", "🎭", "🎪", "🎉", "🌟", "🔥"]
+
+    let messages = [
+        "♪ ノリノリ〜 ♪",
+        "集中！集中！",
+        "いい感じ〜",
+        "まだかな？",
+        "ダンス！ダンス！",
+        "イェーイ！",
+        "ファイト！",
+        "もうすぐ？",
+        "踊れ踊れ〜",
+        "🎵 ズンチャ！",
+        "ほらほら〜",
+        "ボタン押して！",
+        "逃がさないよ！"
+    ]
 
     var body: some View {
-        VStack(spacing: 4) {
-            // 踊るおじさん
-            Text(emojis[currentEmojiIndex])
-                .font(.system(size: 60))
-                .rotationEffect(.degrees(rotation))
-                .offset(y: bounceOffset)
-                .scaleEffect(isAnimating ? 1.1 : 0.9)
+        ZStack {
+            // キラキラエフェクト
+            ForEach(0..<5) { i in
+                Text("✨")
+                    .font(.system(size: 20))
+                    .offset(
+                        x: CGFloat.random(in: -60...60),
+                        y: CGFloat.random(in: -60...60)
+                    )
+                    .opacity(showSparkle ? 1 : 0)
+                    .rotationEffect(.degrees(sparkleRotation + Double(i * 72)))
+            }
 
-            // メッセージ
-            Text(dancingMessage)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundColor(.white.opacity(0.7))
-                .multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+                // 踊るキャラクター
+                Text(emojis[currentEmojiIndex])
+                    .font(.system(size: 70))
+                    .rotationEffect(.degrees(rotation))
+                    .offset(x: horizontalOffset, y: bounceOffset)
+                    .scaleEffect(isAnimating ? 1.2 : 0.8)
+                    .hueRotation(Angle(degrees: colorHue))
+
+                // メッセージ
+                Text(messages[currentMessageIndex])
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color.purple.opacity(0.6))
+                    )
+                    .scaleEffect(isAnimating ? 1.1 : 0.9)
+            }
         }
         .onAppear {
             startDancing()
         }
     }
 
-    private var dancingMessage: String {
-        let messages = [
-            "♪ ノリノリ〜 ♪",
-            "集中！集中！",
-            "いい感じ〜",
-            "まだかな？",
-            "ダンス！ダンス！"
-        ]
-        return messages[currentEmojiIndex]
-    }
-
     private func startDancing() {
         // バウンスアニメーション
-        withAnimation(.easeInOut(duration: 0.3).repeatForever(autoreverses: true)) {
-            bounceOffset = -10
+        withAnimation(.easeInOut(duration: 0.25).repeatForever(autoreverses: true)) {
+            bounceOffset = -15
         }
 
         // 回転アニメーション
-        withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
-            rotation = 10
+        withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
+            rotation = 15
+        }
+
+        // 横移動アニメーション
+        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+            horizontalOffset = 20
         }
 
         // スケールアニメーション
-        withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
+        withAnimation(.easeInOut(duration: 0.35).repeatForever(autoreverses: true)) {
             isAnimating = true
         }
 
-        // 絵文字切り替えタイマー
-        Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { _ in
+        // 色相アニメーション
+        withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+            colorHue = 360
+        }
+
+        // キラキラアニメーション
+        withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
+            showSparkle = true
+        }
+
+        withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+            sparkleRotation = 360
+        }
+
+        // 絵文字切り替え
+        Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                currentEmojiIndex = Int.random(in: 0..<emojis.count)
+            }
+        }
+
+        // メッセージ切り替え
+        Timer.scheduledTimer(withTimeInterval: 1.2, repeats: true) { _ in
             withAnimation(.easeInOut(duration: 0.2)) {
-                currentEmojiIndex = (currentEmojiIndex + 1) % emojis.count
+                currentMessageIndex = Int.random(in: 0..<messages.count)
+            }
+        }
+    }
+}
+
+// 逃げ回るストップボタン
+struct RunawayStopButton: View {
+    let action: () -> Void
+    @State private var buttonOffset: CGSize = .zero
+    @State private var buttonRotation: Double = 0
+    @State private var buttonScale: CGFloat = 1.0
+    @State private var moveTimer: Timer?
+
+    var body: some View {
+        GeometryReader { geometry in
+            Button(action: action) {
+                HStack(spacing: 12) {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                    Text("Stop")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                }
+                .foregroundColor(.white)
+                .frame(width: 160, height: 55)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [Color.pink, Color.red]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .clipShape(Capsule())
+                .shadow(color: Color.red.opacity(0.5), radius: 10, y: 5)
+                .rotationEffect(.degrees(buttonRotation))
+                .scaleEffect(buttonScale)
+            }
+            .position(
+                x: geometry.size.width / 2 + buttonOffset.width,
+                y: geometry.size.height / 2 + buttonOffset.height
+            )
+            .onAppear {
+                startRunning(in: geometry.size)
+            }
+            .onDisappear {
+                moveTimer?.invalidate()
+            }
+        }
+        .frame(height: 120)
+    }
+
+    private func startRunning(in size: CGSize) {
+        // ランダム移動タイマー
+        moveTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { _ in
+            let maxX = (size.width / 2) - 90
+            let maxY: CGFloat = 25
+
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                buttonOffset = CGSize(
+                    width: CGFloat.random(in: -maxX...maxX),
+                    height: CGFloat.random(in: -maxY...maxY)
+                )
+                buttonRotation = Double.random(in: -15...15)
+                buttonScale = CGFloat.random(in: 0.9...1.1)
+            }
+        }
+
+        // 初期移動
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            let maxX = (size.width / 2) - 90
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                buttonOffset = CGSize(
+                    width: CGFloat.random(in: -maxX...maxX),
+                    height: CGFloat.random(in: -25...25)
+                )
             }
         }
     }
@@ -225,8 +353,8 @@ struct ContentView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 20) {
-                // ヘッダー（ランキングボタン）
+            VStack(spacing: 16) {
+                // ヘッダー
                 HStack {
                     Spacer()
                     Button(action: { showRanking = true }) {
@@ -257,7 +385,7 @@ struct ContentView: View {
                     .foregroundColor(.white)
                     .opacity(gameState == .idle ? 1 : 0.5)
 
-                // ユーザー名入力（アイドル状態のみ）
+                // ユーザー名入力
                 if gameState == .idle {
                     userNameInputView
                 }
@@ -271,19 +399,24 @@ struct ContentView: View {
 
                 // ターゲット時間と速度表示
                 if gameState != .idle {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 10) {
                         targetTimeView
                         speedIndicatorView
                     }
                 }
 
-                Spacer()
+                // ボタンエリア
+                if gameState == .running {
+                    // 逃げ回るストップボタン
+                    RunawayStopButton(action: stopGame)
+                } else {
+                    // 通常ボタン
+                    actionButton
+                        .frame(height: 120)
+                }
 
-                // ボタン
-                actionButton
-
                 Spacer()
-                    .frame(height: 40)
+                    .frame(height: 20)
             }
             .padding()
         }
@@ -291,12 +424,10 @@ struct ContentView: View {
             RankingView(rankingManager: rankingManager)
         }
         .onAppear {
-            // 保存されたユーザー名を読み込み
             userName = UserDefaults.standard.string(forKey: userNameKey) ?? ""
         }
     }
 
-    // ユーザー名入力
     private var userNameInputView: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
@@ -324,17 +455,14 @@ struct ContentView: View {
                 )
                 .frame(maxWidth: 250)
                 .onChange(of: userName) { _, newValue in
-                    // ユーザー名を保存
                     UserDefaults.standard.set(newValue, forKey: userNameKey)
                 }
         }
     }
 
-    // メイン表示エリア
     @ViewBuilder
     private var mainDisplayArea: some View {
         ZStack {
-            // 円形の背景
             Circle()
                 .fill(
                     RadialGradient(
@@ -367,7 +495,6 @@ struct ContentView: View {
                     .shadow(color: .cyan.opacity(0.5), radius: 10)
 
             case .running:
-                // 踊るおじさんアニメーション
                 DancingManView()
 
             case .result:
@@ -376,7 +503,6 @@ struct ContentView: View {
         }
     }
 
-    // ターゲット時間表示
     private var targetTimeView: some View {
         HStack(spacing: 8) {
             Image(systemName: "target")
@@ -397,7 +523,6 @@ struct ContentView: View {
         )
     }
 
-    // 速度インジケーター
     private var speedIndicatorView: some View {
         HStack(spacing: 8) {
             Image(systemName: "hare.fill")
@@ -418,7 +543,6 @@ struct ContentView: View {
         )
     }
 
-    // 結果表示
     private var resultView: some View {
         VStack(spacing: 8) {
             Text(resultEmoji)
@@ -437,7 +561,6 @@ struct ContentView: View {
                 .font(.system(size: 12, design: .rounded))
                 .foregroundColor(.white.opacity(0.6))
 
-            // 速度表示
             HStack(spacing: 4) {
                 Image(systemName: "speedometer")
                     .font(.system(size: 10))
@@ -446,7 +569,6 @@ struct ContentView: View {
             }
             .foregroundColor(currentSpeed.color)
 
-            // ランキング表示
             if let rank = currentRank {
                 HStack(spacing: 4) {
                     Image(systemName: "trophy.fill")
@@ -459,7 +581,6 @@ struct ContentView: View {
         }
     }
 
-    // アクションボタン
     private var actionButton: some View {
         Button(action: handleButtonTap) {
             HStack(spacing: 12) {
@@ -472,19 +593,18 @@ struct ContentView: View {
             .frame(width: 200, height: 60)
             .background(
                 LinearGradient(
-                    gradient: Gradient(colors: buttonGradientColors),
+                    gradient: Gradient(colors: [Color.cyan, Color.blue]),
                     startPoint: .leading,
                     endPoint: .trailing
                 )
             )
             .clipShape(Capsule())
-            .shadow(color: buttonGradientColors[0].opacity(0.5), radius: 10, y: 5)
+            .shadow(color: Color.cyan.opacity(0.5), radius: 10, y: 5)
         }
         .disabled(gameState == .countdown || (gameState == .idle && userName.trimmingCharacters(in: .whitespaces).isEmpty))
         .opacity((gameState == .countdown || (gameState == .idle && userName.trimmingCharacters(in: .whitespaces).isEmpty)) ? 0.5 : 1)
     }
 
-    // ボタンのテキスト
     private var buttonText: String {
         switch gameState {
         case .idle:
@@ -495,7 +615,6 @@ struct ContentView: View {
         }
     }
 
-    // ボタンのアイコン
     private var buttonIcon: String {
         switch gameState {
         case .idle, .result: return "play.fill"
@@ -504,17 +623,6 @@ struct ContentView: View {
         }
     }
 
-    // ボタンのグラデーション色
-    private var buttonGradientColors: [Color] {
-        switch gameState {
-        case .idle, .result, .countdown:
-            return [Color.cyan, Color.blue]
-        case .running:
-            return [Color.pink, Color.red]
-        }
-    }
-
-    // 結果の絵文字
     private var resultEmoji: String {
         let diff = abs(elapsedTime - Double(targetSeconds))
         if diff < 0.5 { return "🎯" }
@@ -524,7 +632,6 @@ struct ContentView: View {
         return "💪"
     }
 
-    // 結果メッセージ
     private var resultMessage: String {
         let diff = abs(elapsedTime - Double(targetSeconds))
         if diff < 0.5 { return "完璧！神業です！" }
@@ -534,7 +641,6 @@ struct ContentView: View {
         return "もう一度チャレンジ！"
     }
 
-    // 結果の色
     private var resultColor: Color {
         let diff = abs(elapsedTime - Double(targetSeconds))
         if diff < 0.5 { return .yellow }
@@ -544,7 +650,6 @@ struct ContentView: View {
         return .pink
     }
 
-    // ボタンタップ処理
     private func handleButtonTap() {
         switch gameState {
         case .idle, .result:
@@ -556,7 +661,6 @@ struct ContentView: View {
         }
     }
 
-    // ゲーム開始
     private func startGame() {
         targetSeconds = Int.random(in: 1...60)
         currentSpeed = SpeedMultiplier.random()
@@ -566,7 +670,6 @@ struct ContentView: View {
         let countdownSequence = ["3", "2", "1", "Start!"]
         var index = 0
 
-        // カウントダウンは通常速度（1秒間隔）
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
             if index < countdownSequence.count {
                 countdownText = countdownSequence[index]
@@ -582,16 +685,13 @@ struct ContentView: View {
         }
     }
 
-    // タイマー開始
     private func startTimer() {
         gameState = .running
         startTime = Date()
     }
 
-    // ゲーム停止
     private func stopGame() {
         if let start = startTime {
-            // 実際の経過時間に倍速を適用（倍速が速いほど時間が速く進む）
             let actualTime = Date().timeIntervalSince(start)
             elapsedTime = actualTime * currentSpeed.rawValue
         }
@@ -599,7 +699,6 @@ struct ContentView: View {
         timer = nil
         gameState = .result
 
-        // スコアを保存
         let displayName = userName.trimmingCharacters(in: .whitespaces).isEmpty ? "ゲスト" : userName
         let record = GameRecord(
             userName: displayName,
@@ -620,7 +719,6 @@ struct RankingView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // 背景
                 LinearGradient(
                     gradient: Gradient(colors: [
                         Color(red: 0.1, green: 0.1, blue: 0.2),
@@ -680,14 +778,12 @@ struct RankingView: View {
     }
 }
 
-// ランキング行
 struct RankingRow: View {
     let rank: Int
     let record: GameRecord
 
     var body: some View {
         HStack(spacing: 12) {
-            // 順位
             ZStack {
                 Circle()
                     .fill(rankColor.opacity(0.2))
@@ -704,9 +800,7 @@ struct RankingRow: View {
                 }
             }
 
-            // 記録情報
             VStack(alignment: .leading, spacing: 4) {
-                // ユーザー名
                 Text(record.userName)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
@@ -722,7 +816,6 @@ struct RankingRow: View {
 
                 HStack(spacing: 6) {
                     Text("目標:\(record.targetSeconds)秒")
-                    // 速度表示
                     HStack(spacing: 2) {
                         Image(systemName: "hare.fill")
                             .font(.system(size: 8))
@@ -736,7 +829,6 @@ struct RankingRow: View {
 
             Spacer()
 
-            // 日付
             Text(formattedDate)
                 .font(.system(size: 10, design: .rounded))
                 .foregroundColor(.gray.opacity(0.7))
