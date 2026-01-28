@@ -54,14 +54,16 @@ enum SpeedMultiplier: Double, CaseIterable {
 // ゲーム記録モデル
 struct GameRecord: Identifiable, Codable {
     let id: UUID
+    let userName: String
     let targetSeconds: Int
     let elapsedTime: Double
     let difference: Double
     let speedMultiplier: Double
     let date: Date
 
-    init(targetSeconds: Int, elapsedTime: Double, speedMultiplier: Double = 1.0) {
+    init(userName: String, targetSeconds: Int, elapsedTime: Double, speedMultiplier: Double = 1.0) {
         self.id = UUID()
+        self.userName = userName
         self.targetSeconds = targetSeconds
         self.elapsedTime = elapsedTime
         self.difference = abs(elapsedTime - Double(targetSeconds))
@@ -84,7 +86,7 @@ struct GameRecord: Identifiable, Codable {
 // ランキング管理
 class RankingManager: ObservableObject {
     @Published var records: [GameRecord] = []
-    private let key = "gameRecords_v2"
+    private let key = "gameRecords_v3"
 
     init() {
         loadRecords()
@@ -127,6 +129,72 @@ class RankingManager: ObservableObject {
     }
 }
 
+// 踊るおじさんアニメーション
+struct DancingManView: View {
+    @State private var isAnimating = false
+    @State private var bounceOffset: CGFloat = 0
+    @State private var rotation: Double = 0
+    @State private var armAngle: Double = 0
+
+    let emojis = ["🕺", "💃", "🧍", "🏃", "🚶"]
+    @State private var currentEmojiIndex = 0
+
+    var body: some View {
+        VStack(spacing: 4) {
+            // 踊るおじさん
+            Text(emojis[currentEmojiIndex])
+                .font(.system(size: 60))
+                .rotationEffect(.degrees(rotation))
+                .offset(y: bounceOffset)
+                .scaleEffect(isAnimating ? 1.1 : 0.9)
+
+            // メッセージ
+            Text(dancingMessage)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundColor(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+        }
+        .onAppear {
+            startDancing()
+        }
+    }
+
+    private var dancingMessage: String {
+        let messages = [
+            "♪ ノリノリ〜 ♪",
+            "集中！集中！",
+            "いい感じ〜",
+            "まだかな？",
+            "ダンス！ダンス！"
+        ]
+        return messages[currentEmojiIndex]
+    }
+
+    private func startDancing() {
+        // バウンスアニメーション
+        withAnimation(.easeInOut(duration: 0.3).repeatForever(autoreverses: true)) {
+            bounceOffset = -10
+        }
+
+        // 回転アニメーション
+        withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
+            rotation = 10
+        }
+
+        // スケールアニメーション
+        withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
+            isAnimating = true
+        }
+
+        // 絵文字切り替えタイマー
+        Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                currentEmojiIndex = (currentEmojiIndex + 1) % emojis.count
+            }
+        }
+    }
+}
+
 struct ContentView: View {
     @State private var gameState: GameState = .idle
     @State private var targetSeconds: Int = 10
@@ -138,7 +206,10 @@ struct ContentView: View {
     @State private var showRanking = false
     @State private var currentRank: Int?
     @State private var currentSpeed: SpeedMultiplier = .normal
+    @State private var userName: String = ""
     @StateObject private var rankingManager = RankingManager()
+
+    private let userNameKey = "savedUserName"
 
     var body: some View {
         ZStack {
@@ -154,7 +225,7 @@ struct ContentView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 30) {
+            VStack(spacing: 20) {
                 // ヘッダー（ランキングボタン）
                 HStack {
                     Spacer()
@@ -186,6 +257,11 @@ struct ContentView: View {
                     .foregroundColor(.white)
                     .opacity(gameState == .idle ? 1 : 0.5)
 
+                // ユーザー名入力（アイドル状態のみ）
+                if gameState == .idle {
+                    userNameInputView
+                }
+
                 Spacer()
 
                 // メイン表示エリア
@@ -207,12 +283,50 @@ struct ContentView: View {
                 actionButton
 
                 Spacer()
-                    .frame(height: 50)
+                    .frame(height: 40)
             }
             .padding()
         }
         .sheet(isPresented: $showRanking) {
             RankingView(rankingManager: rankingManager)
+        }
+        .onAppear {
+            // 保存されたユーザー名を読み込み
+            userName = UserDefaults.standard.string(forKey: userNameKey) ?? ""
+        }
+    }
+
+    // ユーザー名入力
+    private var userNameInputView: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "person.fill")
+                    .foregroundColor(.cyan)
+                Text("プレイヤー名")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+
+            TextField("名前を入力", text: $userName)
+                .textFieldStyle(.plain)
+                .font(.system(size: 18, weight: .medium, design: .rounded))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.cyan.opacity(0.3), lineWidth: 1)
+                        )
+                )
+                .frame(maxWidth: 250)
+                .onChange(of: userName) { _, newValue in
+                    // ユーザー名を保存
+                    UserDefaults.standard.set(newValue, forKey: userNameKey)
+                }
         }
     }
 
@@ -253,15 +367,8 @@ struct ContentView: View {
                     .shadow(color: .cyan.opacity(0.5), radius: 10)
 
             case .running:
-                VStack(spacing: 8) {
-                    Image(systemName: "timer")
-                        .font(.system(size: 50))
-                        .foregroundColor(.green)
-                        .symbolEffect(.pulse)
-                    Text("計測中...")
-                        .font(.system(size: 24, weight: .medium, design: .rounded))
-                        .foregroundColor(.white.opacity(0.8))
-                }
+                // 踊るおじさんアニメーション
+                DancingManView()
 
             case .result:
                 resultView
@@ -373,14 +480,16 @@ struct ContentView: View {
             .clipShape(Capsule())
             .shadow(color: buttonGradientColors[0].opacity(0.5), radius: 10, y: 5)
         }
-        .disabled(gameState == .countdown)
-        .opacity(gameState == .countdown ? 0.5 : 1)
+        .disabled(gameState == .countdown || (gameState == .idle && userName.trimmingCharacters(in: .whitespaces).isEmpty))
+        .opacity((gameState == .countdown || (gameState == .idle && userName.trimmingCharacters(in: .whitespaces).isEmpty)) ? 0.5 : 1)
     }
 
     // ボタンのテキスト
     private var buttonText: String {
         switch gameState {
-        case .idle, .result: return "Start"
+        case .idle:
+            return userName.trimmingCharacters(in: .whitespaces).isEmpty ? "名前を入力" : "Start"
+        case .result: return "Start"
         case .countdown: return "..."
         case .running: return "Stop"
         }
@@ -491,7 +600,9 @@ struct ContentView: View {
         gameState = .result
 
         // スコアを保存
+        let displayName = userName.trimmingCharacters(in: .whitespaces).isEmpty ? "ゲスト" : userName
         let record = GameRecord(
+            userName: displayName,
             targetSeconds: targetSeconds,
             elapsedTime: elapsedTime,
             speedMultiplier: currentSpeed.rawValue
@@ -595,6 +706,11 @@ struct RankingRow: View {
 
             // 記録情報
             VStack(alignment: .leading, spacing: 4) {
+                // ユーザー名
+                Text(record.userName)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+
                 HStack {
                     Text("誤差: ")
                         .foregroundColor(.gray)
@@ -602,20 +718,19 @@ struct RankingRow: View {
                         .foregroundColor(resultColor)
                         .fontWeight(.bold)
                 }
-                .font(.system(size: 15, design: .rounded))
+                .font(.system(size: 13, design: .rounded))
 
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Text("目標:\(record.targetSeconds)秒")
-                    Text("実際:\(String(format: "%.1f", record.elapsedTime))秒")
                     // 速度表示
                     HStack(spacing: 2) {
-                        Image(systemName: "speedometer")
-                            .font(.system(size: 9))
+                        Image(systemName: "hare.fill")
+                            .font(.system(size: 8))
                         Text(record.speedDisplayName)
                     }
                     .foregroundColor(speedColor)
                 }
-                .font(.system(size: 11, design: .rounded))
+                .font(.system(size: 10, design: .rounded))
                 .foregroundColor(.gray)
             }
 
