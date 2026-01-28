@@ -7,27 +7,78 @@ enum GameState {
     case result
 }
 
+// 速度倍率
+enum SpeedMultiplier: Double, CaseIterable {
+    case slow = 0.5
+    case normal = 1.0
+    case fast = 1.5
+    case veryFast = 2.0
+    case ultraFast = 3.0
+
+    var displayName: String {
+        switch self {
+        case .slow: return "0.5x"
+        case .normal: return "1x"
+        case .fast: return "1.5x"
+        case .veryFast: return "2x"
+        case .ultraFast: return "3x"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .slow: return .green
+        case .normal: return .cyan
+        case .fast: return .yellow
+        case .veryFast: return .orange
+        case .ultraFast: return .red
+        }
+    }
+
+    // カウントダウンの間隔（倍速が速いほど間隔が短い）
+    var interval: Double {
+        return 1.0 / rawValue
+    }
+
+    static func random() -> SpeedMultiplier {
+        allCases.randomElement() ?? .normal
+    }
+}
+
 // ゲーム記録モデル
 struct GameRecord: Identifiable, Codable {
     let id: UUID
     let targetSeconds: Int
     let elapsedTime: Double
     let difference: Double
+    let speedMultiplier: Double
     let date: Date
 
-    init(targetSeconds: Int, elapsedTime: Double) {
+    init(targetSeconds: Int, elapsedTime: Double, speedMultiplier: Double = 1.0) {
         self.id = UUID()
         self.targetSeconds = targetSeconds
         self.elapsedTime = elapsedTime
         self.difference = abs(elapsedTime - Double(targetSeconds))
+        self.speedMultiplier = speedMultiplier
         self.date = Date()
+    }
+
+    var speedDisplayName: String {
+        switch speedMultiplier {
+        case 0.5: return "0.5x"
+        case 1.0: return "1x"
+        case 1.5: return "1.5x"
+        case 2.0: return "2x"
+        case 3.0: return "3x"
+        default: return "\(speedMultiplier)x"
+        }
     }
 }
 
 // ランキング管理
 class RankingManager: ObservableObject {
     @Published var records: [GameRecord] = []
-    private let key = "gameRecords"
+    private let key = "gameRecords_v2"
 
     init() {
         loadRecords()
@@ -80,6 +131,7 @@ struct ContentView: View {
     @State private var countdownTimer: Timer?
     @State private var showRanking = false
     @State private var currentRank: Int?
+    @State private var currentSpeed: SpeedMultiplier = .normal
     @StateObject private var rankingManager = RankingManager()
 
     var body: some View {
@@ -135,9 +187,12 @@ struct ContentView: View {
 
                 Spacer()
 
-                // ターゲット時間表示
+                // ターゲット時間と速度表示
                 if gameState != .idle {
-                    targetTimeView
+                    VStack(spacing: 12) {
+                        targetTimeView
+                        speedIndicatorView
+                    }
                 }
 
                 Spacer()
@@ -229,24 +284,54 @@ struct ContentView: View {
         )
     }
 
+    // 速度インジケーター
+    private var speedIndicatorView: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "speedometer")
+                .foregroundColor(currentSpeed.color)
+            Text("カウント速度: \(currentSpeed.displayName)")
+                .font(.system(size: 16, weight: .medium, design: .rounded))
+                .foregroundColor(currentSpeed.color)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(currentSpeed.color.opacity(0.1))
+                .overlay(
+                    Capsule()
+                        .stroke(currentSpeed.color.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+
     // 結果表示
     private var resultView: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             Text(resultEmoji)
-                .font(.system(size: 40))
+                .font(.system(size: 36))
 
             Text(String(format: "%.2f秒", elapsedTime))
-                .font(.system(size: 32, weight: .bold, design: .monospaced))
+                .font(.system(size: 28, weight: .bold, design: .monospaced))
                 .foregroundColor(resultColor)
 
             Text(resultMessage)
-                .font(.system(size: 16, weight: .medium, design: .rounded))
+                .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundColor(.white.opacity(0.9))
                 .multilineTextAlignment(.center)
 
             Text("誤差: \(String(format: "%.2f", abs(elapsedTime - Double(targetSeconds))))秒")
-                .font(.system(size: 14, design: .rounded))
+                .font(.system(size: 12, design: .rounded))
                 .foregroundColor(.white.opacity(0.6))
+
+            // 速度表示
+            HStack(spacing: 4) {
+                Image(systemName: "speedometer")
+                    .font(.system(size: 10))
+                Text(currentSpeed.displayName)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+            }
+            .foregroundColor(currentSpeed.color)
 
             // ランキング表示
             if let rank = currentRank {
@@ -254,10 +339,9 @@ struct ContentView: View {
                     Image(systemName: "trophy.fill")
                         .foregroundColor(.yellow)
                     Text("第\(rank)位")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundColor(.yellow)
                 }
-                .padding(.top, 4)
             }
         }
     }
@@ -360,13 +444,15 @@ struct ContentView: View {
     // ゲーム開始
     private func startGame() {
         targetSeconds = Int.random(in: 1...60)
+        currentSpeed = SpeedMultiplier.random()
         gameState = .countdown
         currentRank = nil
 
         let countdownSequence = ["3", "2", "1", "Start!"]
         var index = 0
 
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
+        // 速度に応じたインターバルでカウントダウン
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: currentSpeed.interval, repeats: true) { timer in
             if index < countdownSequence.count {
                 countdownText = countdownSequence[index]
                 index += 1
@@ -374,7 +460,7 @@ struct ContentView: View {
 
             if index == countdownSequence.count {
                 timer.invalidate()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + currentSpeed.interval * 0.5) {
                     startTimer()
                 }
             }
@@ -397,7 +483,11 @@ struct ContentView: View {
         gameState = .result
 
         // スコアを保存
-        let record = GameRecord(targetSeconds: targetSeconds, elapsedTime: elapsedTime)
+        let record = GameRecord(
+            targetSeconds: targetSeconds,
+            elapsedTime: elapsedTime,
+            speedMultiplier: currentSpeed.rawValue
+        )
         currentRank = rankingManager.getRank(for: record.difference)
         rankingManager.addRecord(record)
     }
@@ -477,20 +567,20 @@ struct RankingRow: View {
     let record: GameRecord
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             // 順位
             ZStack {
                 Circle()
                     .fill(rankColor.opacity(0.2))
-                    .frame(width: 44, height: 44)
+                    .frame(width: 40, height: 40)
 
                 if rank <= 3 {
                     Image(systemName: "trophy.fill")
                         .foregroundColor(rankColor)
-                        .font(.system(size: 20))
+                        .font(.system(size: 18))
                 } else {
                     Text("\(rank)")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                 }
             }
@@ -504,13 +594,20 @@ struct RankingRow: View {
                         .foregroundColor(resultColor)
                         .fontWeight(.bold)
                 }
-                .font(.system(size: 16, design: .rounded))
+                .font(.system(size: 15, design: .rounded))
 
-                HStack(spacing: 12) {
-                    Text("目標: \(record.targetSeconds)秒")
-                    Text("実際: \(String(format: "%.2f", record.elapsedTime))秒")
+                HStack(spacing: 8) {
+                    Text("目標:\(record.targetSeconds)秒")
+                    Text("実際:\(String(format: "%.1f", record.elapsedTime))秒")
+                    // 速度表示
+                    HStack(spacing: 2) {
+                        Image(systemName: "speedometer")
+                            .font(.system(size: 9))
+                        Text(record.speedDisplayName)
+                    }
+                    .foregroundColor(speedColor)
                 }
-                .font(.system(size: 12, design: .rounded))
+                .font(.system(size: 11, design: .rounded))
                 .foregroundColor(.gray)
             }
 
@@ -518,7 +615,7 @@ struct RankingRow: View {
 
             // 日付
             Text(formattedDate)
-                .font(.system(size: 11, design: .rounded))
+                .font(.system(size: 10, design: .rounded))
                 .foregroundColor(.gray.opacity(0.7))
         }
         .padding()
@@ -547,6 +644,17 @@ struct RankingRow: View {
         if record.difference < 3 { return .green }
         if record.difference < 5 { return .orange }
         return .pink
+    }
+
+    private var speedColor: Color {
+        switch record.speedMultiplier {
+        case 0.5: return .green
+        case 1.0: return .cyan
+        case 1.5: return .yellow
+        case 2.0: return .orange
+        case 3.0: return .red
+        default: return .white
+        }
     }
 
     private var formattedDate: String {
